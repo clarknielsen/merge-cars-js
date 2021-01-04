@@ -1,0 +1,26 @@
+{
+  "name": "merge-cars-js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.html",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "start": "http-server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clarknielsen/merge-cars-js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/clarknielsen/merge-cars-js/issues"
+  },
+  "homepage": "https://github.com/clarknielsen/merge-cars-js#readme",
+  "dependencies": {
+    "http-server": "^0.12.3"
+  }
+}
