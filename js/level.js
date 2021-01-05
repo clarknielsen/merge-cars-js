@@ -36,7 +36,8 @@ class Level {
   loadTextures(){
     this.textureLoader = new THREE.TextureLoader();
     const promise = Promise.all([
-        this.textureLoader.load('img/tex_water.jpg')
+        this.textureLoader.load('img/tex_water.jpg'),
+        this.textureLoader.load('img/tex_car_police.jpg')
         ], (resolve, reject) => {
       resolve(promise);
     }).then(result => {
@@ -45,6 +46,7 @@ class Level {
   }
   buildScene() {
     this.buildWater();
+    this.buildCars();
     this.addLevel();
     this.setCamera();
     this.update();
@@ -68,6 +70,16 @@ class Level {
 
     geometry.dispose();
     material.dispose();
+  }
+  buildCars() {
+    const material = new THREE.MeshBasicMaterial({ map: this.textures[1] });
+    this.carPolice.children[0].material = material;
+    this.carPolice.add(this.carPolice.children[0].clone());
+    this.carPolice.children[1].applyMatrix(new THREE.Matrix4().makeScale(-1, 1, 1));
+    this.carPolice.scale.set(0.005,0.005,0.005);
+    this.carPolice.rotation.y = 45;
+    console.log(this.carPolice);
+    scene.scene3D.add(this.carPolice);
   }
   setCamera() {
     scene.camera.position.set(0, 10, 10);
