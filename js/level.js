@@ -72,14 +72,35 @@ class Level {
     material.dispose();
   }
   buildCars() {
+    // build police car
     const material = new THREE.MeshBasicMaterial({ map: this.textures[1] });
     this.carPolice.children[0].material = material;
     this.carPolice.add(this.carPolice.children[0].clone());
-    this.carPolice.children[1].applyMatrix(new THREE.Matrix4().makeScale(-1, 1, 1));
-    this.carPolice.scale.set(0.005,0.005,0.005);
-    this.carPolice.rotation.y = 45;
-    console.log(this.carPolice);
+    this.carPolice.children[1].applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
+    this.carPolice.scale.set(0.001,0.001,0.001);
+    
     scene.scene3D.add(this.carPolice);
+
+    this.controls = new THREE.DragControls([this.carPolice], scene.camera, document.getElementById('canvas'));
+    this.controls.transformGroup = true;
+
+    this.controls.addEventListener('drag', (event) => {
+      // restrict movement
+      event.object.position.divideScalar(1).floor().multiplyScalar(1).addScalar(1);
+
+      event.object.position.clamp(new THREE.Vector3(-5, 0, -5), new THREE.Vector3(5, 0, 5));
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    window.addEventListener('mousemove', (event) => {
+      mouse.set( ( event.clientX / window.innerWidth ) * 2 - 1, - ( event.clientY / window.innerHeight ) * 2 + 1 );
+      raycaster.setFromCamera( mouse, scene.camera );
+
+      const intersects = raycaster.intersectObjects( this.carPolice.children, true );
+      console.log(intersects.length);
+    });
   }
   setCamera() {
     scene.camera.position.set(0, 10, 10);
