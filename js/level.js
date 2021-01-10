@@ -23,10 +23,10 @@ class Level {
   loadModels(){
     this.loadedModels = [];
     this.models = [
-        {name: 'level', path: 'models/level.fbx'},
-        {name: 'carPolice', path: 'models/car_police.fbx'},
-        {name: 'carRed', path: 'models/car_red.fbx'},
-        {name: 'carBlue', path: 'models/car_blue.fbx'}
+        {name: 'level', path: 'models/level.FBX'},
+        {name: 'carPolice', path: 'models/car_police.FBX'},
+        {name: 'carRed', path: 'models/car_red.FBX'},
+        {name: 'carBlue', path: 'models/car_blue.FBX'}
       ];
     this.loadedModels.push = (model) => {
       this.loadedModels[this.loadedModels.length] = model;
