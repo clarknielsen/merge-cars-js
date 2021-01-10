@@ -44,7 +44,8 @@ class Level {
         this.textureLoader.load('img/tex_water.jpg'),
         this.textureLoader.load('img/tex_car_police.jpg'),
         this.textureLoader.load('img/tex_car_red.jpg'),
-        this.textureLoader.load('img/tex_car_blue.jpg')
+        this.textureLoader.load('img/tex_car_blue.jpg'),
+        this.textureLoader.load('img/circle.png')
         ], (resolve, reject) => {
       resolve(promise);
     }).then(result => {
@@ -54,6 +55,8 @@ class Level {
   buildScene() {
     this.buildWater();
     this.buildCars();
+    this.buildParticleGroup();
+
     this.addLevel();
     this.setCamera();
     this.update();
@@ -169,7 +172,7 @@ class Level {
           ring.position.clamp(new THREE.Vector3(-4.75, .1, -4.75), new THREE.Vector3(5, .1, 5));
           
           // rotate car towards end point
-          if (draggedCar.position.distanceTo(ring.position) >= .1) {
+          if (draggedCar.position.distanceTo(ring.position) >= .2) {
             draggedCar.lookAt(ring.position);
           }
         }
@@ -178,8 +181,13 @@ class Level {
 
     window.addEventListener('mouseup', (event) => {
       if (draggedCar) {
+        document.body.style.cursor = 'not-allowed';
+
         draggedCar.rotateX(-.5);
         createjs.Tween.removeTweens(draggedCar.position);
+
+        // poof
+        this.makeParticles(this.smokeEmitter, draggedCar.position);
 
         // move car to location
         const time = Math.ceil(draggedCar.position.distanceTo(ring.position)) * 150;
@@ -196,28 +204,33 @@ class Level {
               const box2 = new THREE.Box3().setFromObject(draggedCar);
 
               if (box1.intersectsBox(box2)) {
-                // embiggen
-                createjs.Tween.get(draggedCar.scale)
-                  .to({x: .0025, y: .0025, z: .0025}, 100)
-                  .to({x: .0015, y: .0015, z: .0015}, 200)
-                  .to({x: .002, y: .002, z: .002}, 100);
+                // poof
+                this.makeParticles(this.winEmitter, draggedCar.position);
 
-                // destroy
-                scene.scene3D.remove(tempCar);
-                this.cars.splice(i, 1);
-
-                // last car, so swap out for police
-                if (this.cars.length === 1) {
+                // last two cars, so swap out for police
+                if (this.cars.length === 2) {
                   this.gameOver = true;
                   this.carPolice.position.set(draggedCar.position.x, 0, draggedCar.position.z);
+
+                  scene.scene3D.add(this.carPolice);
+                  scene.scene3D.remove(draggedCar);
+                  scene.scene3D.remove(tempCar);
 
                   createjs.Tween.get(this.carPolice.scale)
                     .to({x: .0045, y: .0045, z: .0045}, 100)
                     .to({x: .0025, y: .0025, z: .0025}, 200)
                     .to({x: .004, y: .004, z: .004}, 100);
-
-                  scene.scene3D.add(this.carPolice);
-                  scene.scene3D.remove(draggedCar);
+                }
+                else {
+                  // embiggen one
+                  createjs.Tween.get(draggedCar.scale)
+                    .to({x: .0025, y: .0025, z: .0025}, 100)
+                    .to({x: .0015, y: .0015, z: .0015}, 200)
+                    .to({x: .002, y: .002, z: .002}, 100);
+  
+                  // destroy other
+                  scene.scene3D.remove(tempCar);
+                  this.cars.splice(i, 1);
                 }
               }
 
@@ -225,13 +238,80 @@ class Level {
             }
           }
         
+          // return to normal
           draggedCar = null;
+          document.body.style.cursor = 'default';
         });
 
         // remove guide
         scene.scene3D.remove(ring);
       }
     });
+  }
+  buildParticleGroup() {
+    // parent emitter holder
+    this.particleGroup = new SPE.Group({
+      texture: {
+        value: this.textures[4]
+      },
+      blending: THREE.NormalBlending,
+      hasPerspective: true,
+      transparent: true,
+      maxParticleCount: 1000
+    });
+    
+    // smoke effect
+    this.smokeEmitter = new SPE.Emitter({
+      particleCount: 20,
+      activeMultiplier: 3,
+      type: SPE.distributions.SPHERE,
+      position: {
+        radius: .1
+      },
+      maxAge: { value: 1 },
+      duration: 0.8,
+      velocity: {
+        value: new THREE.Vector3( 0.25 )
+      },
+      size: { value: [.25, .75] },
+      color: {
+        value: new THREE.Color(0xfafafa)
+      },
+      opacity: { value: [.25, 0] }
+    });
+    
+    // merge effect
+    this.winEmitter = new SPE.Emitter({
+      particleCount: 100,
+      activeMultiplier: 100,
+      type: SPE.distributions.DISC,
+      position: {
+        radius: .1
+      },
+      maxAge: { value: 1 },
+      duration: 0.8,
+      velocity: {
+        value: new THREE.Vector3( 2 )
+      },
+      size: { value: [0, .5, 0] },
+      color: {
+        value: new THREE.Color(0x00FF00)
+      },
+      opacity: { value: 1 }
+    });
+
+    this.smokeEmitter.disable();
+    this.winEmitter.disable();
+
+    this.particleGroup.addEmitter(this.smokeEmitter);
+    this.particleGroup.addEmitter(this.winEmitter);
+
+    scene.scene3D.add(this.particleGroup.mesh);
+  }
+  makeParticles(emitter, position) {
+    emitter.position.value = position;
+    emitter.reset(true);
+    emitter.enable();
   }
   setCamera() {
     scene.camera.position.set(0, 10, 10);
@@ -240,5 +320,6 @@ class Level {
   update() {
     requestAnimationFrame(this.update.bind(this));
     this.deltaTime = this.clock.getDelta();
+    this.particleGroup.tick(this.deltaTime);
   }
 }
