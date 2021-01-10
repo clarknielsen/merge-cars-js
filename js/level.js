@@ -105,16 +105,26 @@ class Level {
 
     // position around level
     for (let i = 0; i < this.cars.length; i++) {
-      this.cars[i].position.set(0.25, 0, 0.25);
+      this.cars[i].position.set(
+        Math.floor(Math.random() * 10) - 5 + .25, 
+        0, 
+        Math.floor(Math.random() * 10) - 5 + .25
+      );
+
       scene.scene3D.add(this.cars[i]);
     }
 
     // drag controls
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(.4, .45, 32),
+      new THREE.MeshBasicMaterial({color: 0xffff00, side: THREE.DoubleSide})
+    );
+    ring.name = "ring";
+    ring.rotateX(-Math.PI / 2);
+    
     let draggedCar;
-    let panel;
-    let line;
 
     window.addEventListener('mousedown', (event) => {
       // prevent dragging
@@ -126,23 +136,12 @@ class Level {
       if (intersects[0] && intersects[0].object.name.indexOf("car") !== -1) {
         draggedCar = intersects[0].object.parent;
 
-        // add drag guides to scene
-        const material = new THREE.LineBasicMaterial({color: 0xffff00});
-        const points = [];
-        points.push(new THREE.Vector3(draggedCar.position.x, 0, draggedCar.position.z));
-        points.push(new THREE.Vector3(draggedCar.position.x, 0, draggedCar.position.z));
+        // start engine
+        createjs.Tween.get(draggedCar.position, {loop: true}).to(new THREE.Vector3(draggedCar.position.x, .05, draggedCar.position.z), 100);
 
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        line = new THREE.Line(geometry, material);
-        scene.scene3D.add(line);
-
-        panel = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.5, 0.5, 0.5),
-          new THREE.MeshBasicMaterial({color: 0xffff00, side: THREE.DoubleSide})
-        );
-        panel.rotateX(-Math.PI / 2);
-        panel.position.set(draggedCar.position.x, draggedCar.position.y, draggedCar.position.z);
-        scene.scene3D.add(panel);
+        // add drag guide to scene
+        ring.position.set(draggedCar.position.x, .1, draggedCar.position.z);
+        scene.scene3D.add(ring);
       }
     });
 
@@ -154,35 +153,37 @@ class Level {
       );
       raycaster.setFromCamera(mouse, scene.camera);
 
-      if (draggedCar) {
+      if (draggedCar && scene.scene3D.getObjectByName('ring')) {
+        // find location on level
         const intersects = raycaster.intersectObjects(this.level.children);
 
         if (intersects[0]) {
-          // update drag guides
-          panel.position.set(
+          // update drag guide
+          ring.position.set(
             Math.round(intersects[0].point.x / .5) * .5 - .25, 
-            0, 
+            0.1, 
             Math.round(intersects[0].point.z / .5) * .5 - .25
           );
 
           // set boundaries
-          panel.position.clamp(new THREE.Vector3(-4.75, 0, -4.75), new THREE.Vector3(5, 0, 5));
-  
-          const points = line.geometry.attributes.position.array;
-          points[3] = panel.position.x;
-          points[5] = panel.position.z;
-          line.geometry.attributes.position.needsUpdate = true;
+          ring.position.clamp(new THREE.Vector3(-4.75, .1, -4.75), new THREE.Vector3(5, .1, 5));
+          
+          // rotate car towards end point
+          if (draggedCar.position.distanceTo(ring.position) >= .1) {
+            draggedCar.lookAt(ring.position);
+          }
         }
       }
     });
 
     window.addEventListener('mouseup', (event) => {
       if (draggedCar) {
-        draggedCar.lookAt(panel.position);
         draggedCar.rotateX(-.5);
+        createjs.Tween.removeTweens(draggedCar.position);
 
-        // move car to location  
-        createjs.Tween.get(draggedCar.position).to(panel.position, 500).call(() => {
+        // move car to location
+        const time = Math.ceil(draggedCar.position.distanceTo(ring.position)) * 150;
+        createjs.Tween.get(draggedCar.position).to(ring.position, time).call(() => {
           draggedCar.rotation.set(0, 0, 0);
 
           // check for overlapping cars
@@ -227,9 +228,8 @@ class Level {
           draggedCar = null;
         });
 
-        // remove guides
-        scene.scene3D.remove(line);
-        scene.scene3D.remove(panel);
+        // remove guide
+        scene.scene3D.remove(ring);
       }
     });
   }
