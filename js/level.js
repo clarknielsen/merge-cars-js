@@ -45,7 +45,8 @@ class Level {
         this.textureLoader.load('img/tex_car_police.jpg'),
         this.textureLoader.load('img/tex_car_red.jpg'),
         this.textureLoader.load('img/tex_car_blue.jpg'),
-        this.textureLoader.load('img/circle.png')
+        this.textureLoader.load('img/circle.png'),
+        this.textureLoader.load('img/shine.png')
         ], (resolve, reject) => {
       resolve(promise);
     }).then(result => {
@@ -54,8 +55,8 @@ class Level {
   }
   buildScene() {
     this.buildWater();
+    this.buildEffects();
     this.buildCars();
-    this.buildParticleGroup();
 
     this.addLevel();
     this.setCamera();
@@ -119,14 +120,7 @@ class Level {
 
     // drag controls
     const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(.4, .45, 32),
-      new THREE.MeshBasicMaterial({color: 0xffff00, side: THREE.DoubleSide})
-    );
-    ring.name = "ring";
-    ring.rotateX(-Math.PI / 2);
-    
+    const mouse = new THREE.Vector2();    
     let draggedCar;
 
     window.addEventListener('mousedown', (event) => {
@@ -143,8 +137,8 @@ class Level {
         createjs.Tween.get(draggedCar.position, {loop: true}).to(new THREE.Vector3(draggedCar.position.x, .05, draggedCar.position.z), 100);
 
         // add drag guide to scene
-        ring.position.set(draggedCar.position.x, .1, draggedCar.position.z);
-        scene.scene3D.add(ring);
+        this.ring.position.set(draggedCar.position.x, .1, draggedCar.position.z);
+        scene.scene3D.add(this.ring);
       }
     });
 
@@ -162,18 +156,18 @@ class Level {
 
         if (intersects[0]) {
           // update drag guide
-          ring.position.set(
+          this.ring.position.set(
             Math.round(intersects[0].point.x / .5) * .5 - .25, 
             0.1, 
             Math.round(intersects[0].point.z / .5) * .5 - .25
           );
 
           // set boundaries
-          ring.position.clamp(new THREE.Vector3(-4.75, .1, -4.75), new THREE.Vector3(5, .1, 5));
+          this.ring.position.clamp(new THREE.Vector3(-4.75, .1, -4.75), new THREE.Vector3(5, .1, 5));
           
           // rotate car towards end point
-          if (draggedCar.position.distanceTo(ring.position) >= .2) {
-            draggedCar.lookAt(ring.position);
+          if (draggedCar.position.distanceTo(this.ring.position) >= .2) {
+            draggedCar.lookAt(this.ring.position);
           }
         }
       }
@@ -187,11 +181,12 @@ class Level {
         createjs.Tween.removeTweens(draggedCar.position);
 
         // poof
-        this.makeParticles(this.smokeEmitter, draggedCar.position);
+        this.smokeEmitter.position.value = draggedCar.position;
+        this.smokeEmitter.enable();
 
         // move car to location
-        const time = Math.ceil(draggedCar.position.distanceTo(ring.position)) * 150;
-        createjs.Tween.get(draggedCar.position).to(ring.position, time).call(() => {
+        const time = Math.ceil(draggedCar.position.distanceTo(this.ring.position)) * 150;
+        createjs.Tween.get(draggedCar.position).to(this.ring.position, time).call(() => {
           draggedCar.rotation.set(0, 0, 0);
 
           // check for overlapping cars
@@ -204,12 +199,17 @@ class Level {
               const box2 = new THREE.Box3().setFromObject(draggedCar);
 
               if (box1.intersectsBox(box2)) {
-                // poof
-                this.makeParticles(this.winEmitter, draggedCar.position);
+                // shine 'em up
+                this.shine.position.set(draggedCar.position.x, .1, draggedCar.position.z);
+                this.shine.rotateX(0);
+                this.shine.material.opacity = 1;
+                createjs.Tween.get(this.shine.rotation).to({ z: 90 }, 500);
+                createjs.Tween.get(this.shine.material).to({ opacity: 0 }, 500);
 
                 // last two cars, so swap out for police
                 if (this.cars.length === 2) {
                   this.gameOver = true;
+                  this.shine.scale.set(4, 4, 4);
                   this.carPolice.position.set(draggedCar.position.x, 0, draggedCar.position.z);
 
                   scene.scene3D.add(this.carPolice);
@@ -244,12 +244,12 @@ class Level {
         });
 
         // remove guide
-        scene.scene3D.remove(ring);
+        scene.scene3D.remove(this.ring);
       }
     });
   }
-  buildParticleGroup() {
-    // parent emitter holder
+  buildEffects() {
+    // particle emitter holder
     this.particleGroup = new SPE.Group({
       texture: {
         value: this.textures[4]
@@ -277,41 +277,36 @@ class Level {
       color: {
         value: new THREE.Color(0xfafafa)
       },
-      opacity: { value: [.25, 0] }
-    });
-    
-    // merge effect
-    this.winEmitter = new SPE.Emitter({
-      particleCount: 100,
-      activeMultiplier: 100,
-      type: SPE.distributions.DISC,
-      position: {
-        radius: .1
-      },
-      maxAge: { value: 1 },
-      duration: 0.8,
-      velocity: {
-        value: new THREE.Vector3( 2 )
-      },
-      size: { value: [0, .5, 0] },
-      color: {
-        value: new THREE.Color(0x00FF00)
-      },
-      opacity: { value: 1 }
+      opacity: { value: [.3, 0] }
     });
 
     this.smokeEmitter.disable();
-    this.winEmitter.disable();
-
     this.particleGroup.addEmitter(this.smokeEmitter);
-    this.particleGroup.addEmitter(this.winEmitter);
 
     scene.scene3D.add(this.particleGroup.mesh);
-  }
-  makeParticles(emitter, position) {
-    emitter.position.value = position;
-    emitter.reset(true);
-    emitter.enable();
+
+    // create ring placeholder
+    this.ring = new THREE.Mesh(
+      new THREE.RingGeometry(.4, .45, 32),
+      new THREE.MeshBasicMaterial({color: 0xffff00, side: THREE.DoubleSide})
+    );
+    this.ring.name = "ring";
+    this.ring.rotateX(-Math.PI / 2);
+
+    // create spinning shine graphic
+    this.shine = new THREE.Mesh(
+      new THREE.PlaneBufferGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ 
+        map: this.textures[5],
+        transparent: true
+      })
+    );
+
+    this.shine.scale.set(2, 2, 2);
+    this.shine.material.opacity = 0;
+    this.shine.rotation.set(THREE.Math.degToRad(-90), 0, 0);
+
+    scene.scene3D.add(this.shine);
   }
   setCamera() {
     scene.camera.position.set(0, 10, 10);
